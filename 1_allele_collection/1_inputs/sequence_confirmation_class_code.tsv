@@ -1,8 +1,8 @@
-code	description
+id	description
 1	perfectly validated
 2	partially validated, >= 50% coverage
 3	wild type
-4	partial wild type, >= 50% coverage
+4	partial wild type, target not covered, >= 50% coverage
 5	target and off-target mutation, >= 50% coverage
 6	off-target mutation, >= 50% coverage
 7	truncated, < 50% coverage

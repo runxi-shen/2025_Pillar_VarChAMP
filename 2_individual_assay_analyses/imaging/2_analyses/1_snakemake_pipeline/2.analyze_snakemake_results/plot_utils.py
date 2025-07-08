@@ -7,9 +7,17 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import sys
 from skimage.io import imread
-sys.path.append("../../../2_analyses/1_snakemake_pipeline/2025_varchamp_snakemake/1.image_preprocess_qc/scripts/")
+sys.path.append("../1.image_preprocess_qc/scripts/")
 from img_utils import *
 
+
+clinvar_palette_set2 = sns.color_palette("Set2")
+clinvar_palette_set2[0], clinvar_palette_set2[1], clinvar_palette_set2[2], clinvar_palette_set2[3], clinvar_palette_set2[4], clinvar_palette_set2[5], clinvar_palette_set2[7] = \
+clinvar_palette_set2[1], clinvar_palette_set2[4], clinvar_palette_set2[3], clinvar_palette_set2[2], clinvar_palette_set2[0], clinvar_palette_set2[7], clinvar_palette_set2[5]
+clinvar_category = ['1_Pathogenic', '2_Benign', '3_Conflicting', '4_VUS', '5_Others', '6_No_ClinVar']
+palette_dict = {
+    "clinvar": dict(zip(clinvar_category, clinvar_palette_set2[:7]))
+}
 
 ## Letter dict to convert well position to img coordinates
 letter_dict = {
@@ -18,7 +26,6 @@ letter_dict = {
     "C": "03",
     "D": "04",
     "E": "05",
-    "F": "06",
     "G": "07",
     "H": "08",
     "I": "09",
@@ -55,6 +62,26 @@ color_map = {
     '': 'white'  # White for missing wells
 }
 
+
+def plot_top_n_important_feat(df, feat_cols, n=10, ax=None, title=""):
+    # Calculate mean and standard deviation for each column
+    column_stats = df[feat_cols].agg(['mean', 'std']).T
+    # Sort columns by the sum of mean and std in descending order
+    sorted_columns = column_stats.sort_values(by=["mean"], ascending=False)
+    sorted_columns = sorted_columns.head(n)
+    # display(sorted_columns)
+
+    # Plot mean and std for each column
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(5, 4))
+    ax.barh(y=sorted_columns.index, width=sorted_columns["mean"], color='skyblue') ## yerr=sorted_columns["std"], capsize=5, edgecolor='black'
+    ax.set_yticks(range(len(sorted_columns.index)))
+    ax.set_yticklabels(sorted_columns.index, rotation=0, fontsize=12)
+    # ax.set_xlabel("Mean")
+    ax.set_title(f"Top {n} Features Importance Mean {title}")
+    ax.axvline(x=0.01, color='r', linestyle='--')
+    return sorted_columns
+    
 
 def plot_platemap(
     df,
@@ -302,6 +329,118 @@ def plot_allele(pm, variant, sel_channel, plate_img_qc, auroc_df=None, site="05"
                            verticalalignment='bottom', horizontalalignment='right', transform=axes.flatten()[plot_idx].transAxes,
                            bbox=dict(facecolor='black', alpha=0.3, linewidth=2))
             axes.flatten()[plot_idx].axis("off")
+        
+    plt.tight_layout()
+    plt.subplots_adjust(wspace=.01, hspace=-0.2, top=.99)
+    
+    if display:
+        plt.show()
+    file_name = f"{variant}_{sel_channel}"
+    if auroc:
+        file_name = f"{file_name}_{auroc:.3f}"
+    if ref_well:
+        file_name = f"{file_name}_REF-{ref_well[0]}"
+    if var_well:
+        file_name = f"{file_name}_VAR-{var_well[0]}"
+        
+    if output_dir:
+        fig.savefig(os.path.join(output_dir, f"{file_name}.png"), dpi=400, bbox_inches='tight')
+        plt.close(fig)
+
+
+def plot_allele_single_plate(pm, variant, sel_channel, plate_img_qc, auroc_df=None, site="05", ref_well=[], var_well=[], max_intensity=0.99, display=False, imgs_dir="", output_dir=""):
+    assert imgs_dir != "", "Image directory has to be input!"
+    plt.clf()
+    cmap = channel_to_cmap(sel_channel)
+    channel = channel_dict[sel_channel]
+    if auroc_df is not None:
+        auroc = auroc_df.filter(pl.col("allele_0")==variant)["AUROC_Mean"].mean()
+    else:
+        auroc = ""
+    
+    ## get the number of wells/images per allele
+    plate_map = pm.filter(pl.col("gene_allele") == variant).select("plate_map_name").to_pandas().values.flatten()
+    wt = variant.split("_")[0]
+    wt_wells = pm.filter(pl.col("gene_allele") == wt).select("imaging_well").to_pandas().values.flatten()
+    var_wells = pm.filter(pl.col("gene_allele") == variant).select("imaging_well").to_pandas().values.flatten()
+    
+    if ref_well:
+        wt_wells = [well for well in wt_wells if well in ref_well]
+    if var_well:
+        var_wells = [well for well in var_wells if well in var_well]
+    
+    pm_var = pm.filter(
+        (pl.col("imaging_well").is_in(np.concatenate([wt_wells, var_wells])))
+        &(pl.col("plate_map_name").is_in(plate_map))
+    ).sort(by=["gene_allele", "plate_map_name", "imaging_well"],
+           descending=[True, False, False])
+    # print(pm_var)
+    # return None
+    
+    fig, axes = plt.subplots(4, 4, figsize=(15, 2*8), sharex=True, sharey=True)
+    for plot_idx, pm_row in enumerate(pm_var.iter_rows(named=True)):
+        well = pm_row["imaging_well"]
+        allele = pm_row["gene_allele"]
+
+        if plot_idx < 4 or (plot_idx >= 8 and plot_idx < 12):
+            sel_plate = pm_row["imaging_plate_R1"]
+        else:
+            sel_plate = pm_row["imaging_plate_R2"]
+            
+        if "_" in sel_plate:
+            batch_plate_map = sel_plate.split("_")[0]
+        else:
+            batch_plate_map = sel_plate
+            
+        batch = batch_dict[batch_plate_map]
+        batch_img_dir = f'{imgs_dir}/{batch}/images'
+        
+        letter = well[0]
+        row = letter_dict[letter]
+        col = well[1:3]
+        
+        plate_img_dir = plate_dict[sel_plate]
+        img_file = f"r{row}c{col}f{site}p01-ch{channel}sk1fk1fl1.tiff"
+
+        # print(batch, well, plate_img_dir, img_file)
+        # break
+
+        if plate_img_qc is not None:
+            is_bg = plate_img_qc.filter(
+                (pl.col("plate") == plate_img_dir.split("__")[0])
+                & (pl.col("well") == well)
+                & (pl.col("channel") == sel_channel))["is_bg"].to_numpy()[0]
+        if (os.path.exists(f"{batch_img_dir}/{plate_img_dir}/Images/{img_file}")):
+            img = imread(f"{batch_img_dir}/{plate_img_dir}/Images/{img_file}", as_gray=True)
+        else:
+            # Define your S3 path and local destination
+            s3_path = f's3://cellpainting-gallery/cpg0020-varchamp/broad/images/{batch}/images/{plate_img_dir}/Images/{img_file}'
+            local_path = f"{batch_img_dir}/{plate_img_dir}/Images/{img_file}"
+            # Build the aws cli command
+            cmd = ['aws', 's3', 'cp', '--no-sign-request', s3_path, local_path]
+            # Execute the command using subprocess
+            try:
+                subprocess.run(cmd, check=True)
+                print(f"Successfully downloaded from {s3_path} to {local_path}")
+            except subprocess.CalledProcessError as e:
+                print(f"An error occurred: {e}")
+            img = imread(f"{batch_img_dir}/{plate_img_dir}/Images/{img_file}", as_gray=True)
+        
+        # print(i, wt_var, plot_idx)
+        axes.flatten()[plot_idx].imshow(img, vmin=0, vmax=np.percentile(img, max_intensity*100), cmap=cmap)
+        plot_label = f"{sel_channel}:{sel_plate}\nWell:{well},Site:{site}\n{allele}"
+        axes.flatten()[plot_idx].text(0.03, 0.97, plot_label, color='white', fontsize=10,
+                verticalalignment='top', horizontalalignment='left', transform=axes.flatten()[plot_idx].transAxes,
+                bbox=dict(facecolor='black', alpha=0.3, linewidth=2))
+        if is_bg:
+            axes.flatten()[plot_idx].text(0.03, 0.03, "FLAG:\nOnly Background\nNoise is Detected", color='red', fontsize=10,
+                verticalalignment='bottom', horizontalalignment='left', transform=axes.flatten()[plot_idx].transAxes,
+                bbox=dict(facecolor='white', alpha=0.3, linewidth=2))
+        int_95 = str(int(round(np.percentile(img, 95))))
+        axes.flatten()[plot_idx].text(0.97, 0.03, f"95th Intensity:{int_95}\nSet vmax:{max_intensity*100:.0f}th perc.", color='white', fontsize=10,
+                       verticalalignment='bottom', horizontalalignment='right', transform=axes.flatten()[plot_idx].transAxes,
+                       bbox=dict(facecolor='black', alpha=0.3, linewidth=2))
+        axes.flatten()[plot_idx].axis("off")
         
     plt.tight_layout()
     plt.subplots_adjust(wspace=.01, hspace=-0.2, top=.99)

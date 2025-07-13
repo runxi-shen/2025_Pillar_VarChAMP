@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import sys
 from skimage.io import imread
-sys.path.append("../1.image_preprocess_qc/scripts/")
+sys.path.append("../2025_varchamp_snakemake/1.image_preprocess_qc/scripts/")
 from img_utils import *
 
 

@@ -206,3 +206,5 @@ varchamp_alleles_with_pillar_annotations.tsv
 pillar_alleles_with_varchamp_annotations.tsv
 pillar_snp_alleles.tsv
 
+# Large parquet files (exceed GitHub 100MB limit)
+2_individual_assay_analyses/imaging/3_outputs/2_results_summary/F9/f9_sc_gfp_features.parquet

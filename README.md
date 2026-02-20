@@ -1,29 +1,54 @@
 # 2025_Pillar_VarChAMP
-Repository for analyzing VarChAMP dataset in the pillar project publication. Each folder with prefixes 1_ through 3_ correspond to a section in the manuscript, and has the following subfolders:
 
-## Overview of repo structure
-- **1_inputs**: raw input data (ie. unnormalized assay data) or annotations (ie. ClinVar annotations) that has not been used in the analysis before
-- **2_analysis**: any scripts used to process or analyze the input data
-- **3_outputs**: intermediary outputs (ie. normalized assay data) that will be read in by any script in any of the analysis folders
+This repository contains the code and data to reproduce **Figure 7** from the VarChAMP Pillar project publication.
 
-All input data is either included in this repository, or is downloaded from public sources using an .sh or a python script. 
+**Paper:** [A Scalable Variant Effect Mapping Resource for Accelerating Comprehensive Genome Interpretation](https://www.biorxiv.org/content/10.64898/2026.02.14.705848v1.full)
 
-## How to contribute
-Fork the repo (click the 'Fork' button in the top right), clone the fork to your local computer, and create a new branch:
+## Repository Structure
+
 ```
-git clone https://github.com/<YOUR-USERNAME>/2025_Pillar_VarChAMP.git
-cd ./2025_Pillar_VarChAMP
-git checkout -b branch-name
+2025_Pillar_VarChAMP/
+├── 1_allele_collection/           # Allele processing from Zenodo data
+├── 2_dms_bms_overlap_analyses/    # F9 imaging analysis and figures
+├── 3_integrated_assay_analyses/   # Cross-assay integration figures
+├── utils/                         # Shared utilities
+└── env.yml                        # Conda environment
 ```
 
-It is good practice to create a new branch for each task / contribution that you will make to the overall repository. For example, you might create a branch "ppi-data-analysis" to add an input table and processing pipeline for the PPI data. Once you've made the changes in your local repo, commit and push the contributions:
-```
-git add .
-git commit -m "data and analysis of PPI dataset"
-git push
-```
-Note that the first time that you try and push, you will get an error. Git will suggest a slightly different command - follow their suggestions. After this is run once, you can use plain `git push` in the future. 
+## Quick Start
 
-In the Github web interface, navigate to your branch within your repo. Click the "Contribute" dropdown and then the "Open pull request" button. This will make a request to the main parent repository to merge the changes that you've contributed on your branch. It's good practice to have someone review your contributions and request any necessary edits before merging into the parent repository. Tag another repository contributor in the "Request Review" section. Once they've approved the merge, delete your branch.
+### 1. Set up environment
+```bash
+conda env create -f env.yml
+conda activate varchamp
+```
 
-If you'd like to learn more about how git and github work, Jess suggests [this lecture](https://missing.csail.mit.edu/2020/version-control/) or [this online game](https://learngitbranching.js.org/). 
+### 2. Run analyses
+
+**F9 Imaging Figures:**
+```bash
+cd 2_dms_bms_overlap_analyses/imaging/2_analyses/F9_analyses/
+jupyter notebook 1_F9_visualizations.ipynb
+jupyter notebook 2_F9_cell_crops.ipynb
+```
+
+**Integrated Assay Figures:**
+```bash
+cd 3_integrated_assay_analyses/2_analyses/
+jupyter notebook 0_integrative_assay_summary.ipynb
+```
+
+## Output Figures
+
+All manuscript figures are saved as SVG files in `3_outputs/pillar_manuscript_figures/` within each analysis directory.
+
+## External Resources
+
+| Resource | Description |
+|----------|-------------|
+| [VarChAMP Snakemake Pipeline](https://github.com/broadinstitute/2025_varchamp_snakemake/releases/tag/PillarManuscript) | Cell Painting image processing pipeline (run batches 7, 8, 11, 12, 13, 14, 15, 16 to reproduce from raw images) |
+| [2025_laval_submitted](https://github.com/broadinstitute/2025_laval_submitted) | Source of integrated assay results (will be public with paper release) |
+
+## License
+
+See [LICENSE](LICENSE) for details.

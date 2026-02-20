@@ -4,163 +4,198 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Overview
 
-This repository analyzes VarChAMP dataset for the pillar project publication. The codebase is organized into three main sections, each with a standardized folder structure:
+This repository contains analysis code and figures for the VarChAMP Pillar project publication. It generates manuscript figures from pre-processed data, with external pipelines referenced for full reproducibility.
 
-- `1_allele_collection/` - Data collection and processing
-- `2_individual_assay_analyses/` - Analysis of specific assays (dual_ipa, imaging, ppi, threshold_calibration)  
-- `3_integrated_assay_analyses/` - Cross-assay integration and structural analyses
+## Directory Structure
 
-Each section follows a consistent pattern:
-- `1_inputs/` - Raw input data or annotations
-- `2_analyses/` - Processing and analysis scripts
-- `3_outputs/` - Intermediate outputs for use by other analyses
-
-## Development Environment Setup
-
-### Primary Environment
-The main computational environment uses conda with comprehensive dependencies:
-
-```bash
-# Create and activate the main environment
-conda env create -f 2_individual_assay_analyses/imaging/2_analyses/1_snakemake_pipeline/2025_varchamp_snakemake/env.yml
-conda activate varchamp
+```
+2025_Pillar_VarChAMP/
+├── 1_allele_collection/           # Allele processing from Zenodo data
+├── 2_dms_bms_overlap_analyses/    # DMS/BMS overlap analyses (imaging)
+├── 3_integrated_assay_analyses/   # Cross-assay integration
+├── utils/                         # Shared utilities (fonts, functions)
+├── env.yml                        # Conda environment specification
+└── CLAUDE.md                      # This file
 ```
 
-This environment includes:
-- Python 3.8 with scientific computing stack (numpy, pandas, matplotlib, seaborn, scikit-learn)
-- Polars for high-performance data manipulation
-- Jupyter notebook environment
-- Snakemake for workflow management
-- CUDA toolkit for GPU acceleration
-- Specialized libraries: pycytominer, cytotable, duckdb, pyarrow
+---
 
-### Alternative Environment (macOS)
-For macOS users, a lighter environment is available:
+## 1_allele_collection/
 
-```bash
-conda env create -f 2_individual_assay_analyses/dual_ipa/2_analyses/env-reqs.txt
+Processes and consolidates Pillar allele collection data from Zenodo.
+
+```
+1_allele_collection/
+├── 1_inputs/
+│   └── raw_inputs/
+│       └── final_pillar_data_with_clinvar_*.csv.gz   # Raw Zenodo data
+├── 2_analyses/
+│   └── 0_pillar_allele_collection_process.ipynb      # Main processing notebook
+└── 3_outputs/
+    └── pillar_snp_alleles.tsv                        # ~92,941 SNP/missense variants
 ```
 
-## Key Analysis Workflows
+**Workflow:**
+- Downloads Pillar data from Zenodo (with MD5 validation)
+- Filters to SNP/missense variants (single nucleotide changes)
+- Standardizes gene names and HGVS protein nomenclature
+- Outputs unique variants across 40 genes
 
-### Imaging Analysis Pipeline
-The imaging analysis uses Snakemake workflows located in `2_individual_assay_analyses/imaging/2_analyses/1_snakemake_pipeline/`:
+---
 
-```bash
-# Navigate to the snakemake directory
-cd 2_individual_assay_analyses/imaging/2_analyses/1_snakemake_pipeline/2025_varchamp_snakemake/
+## 2_dms_bms_overlap_analyses/
 
-# Run image preprocessing QC
-python 1.image_preprocess_qc/scripts/1_calc_plate_bg.py --batch_list "batch_names" --input_dir "input_path" --output_dir "output_path" --workers 256
+Analysis comparing DMS (Deep Mutational Scanning) and BMS (biomarker/phenotype) overlap. Currently contains F9 imaging analysis.
 
-# Run snakemake pipeline for specific batches
-snakemake --snakefile Snakefile_batch[X] --directory [working_dir] --cores 256
+```
+2_dms_bms_overlap_analyses/
+└── imaging/
+    ├── README.md
+    ├── 1_inputs/
+    │   └── README.md                    # Points to shared inputs
+    ├── 2_analyses/
+    │   └── F9_analyses/
+    │       ├── 0_extract_f9_data.py     # Extract from external pipeline
+    │       ├── 1_F9_visualizations.ipynb # Main figures
+    │       └── 2_F9_cell_crops.ipynb    # Cell crop images
+    ├── 3_outputs/
+    │   ├── data/F9/
+    │   │   ├── f9_sc_features_minimal.parquet
+    │   │   ├── f9_feature_importance.parquet
+    │   │   └── f9_variant_zscore_features.parquet
+    │   └── pillar_manuscript_figures/
+    │       ├── F9_*.svg                 # Main figures
+    │       └── cell_crops/*.svg         # Cell images
+    └── _external_pipeline/
+        └── README.md                    # Links to public snakemake release
 ```
 
-### Dual IPA Analysis
-Located in `2_individual_assay_analyses/dual_ipa/2_analyses/`:
-- Process flow cytometry data
-- Compute allele-level statistics
-- Generate perturbation scores
+**External Pipeline:**
+- Public release: https://github.com/broadinstitute/2025_varchamp_snakemake/releases/tag/PillarManuscript
+- Run batches: 7, 8, 11, 12, 13, 14, 15, 16
 
-### PPI Analysis
-Located in `2_individual_assay_analyses/ppi/2_analyses/`:
-- Edgotyping score analysis
-- Likelihood ratio calculations using R scripts
-
-### Threshold Calibration
-Located in `2_individual_assay_analyses/threshold_calibration/`:
-
+**Quick Start:**
 ```bash
-# Run likelihood ratio calculations
-./runLLR.sh
-./runLLR_max.sh
-
-# R-based analysis
-Rscript buildLLR.R
-Rscript calcLLR.R
+cd 2_dms_bms_overlap_analyses/imaging/2_analyses/F9_analyses/
+jupyter notebook 1_F9_visualizations.ipynb
 ```
 
-## Code Architecture
+---
 
-### Data Processing Pipeline
-1. **Raw Data Ingestion**: Scripts in `1_inputs/` directories download and prepare raw datasets
-2. **Individual Assay Processing**: Each assay type has specialized processing modules
-3. **Integration**: Cross-assay analysis combines results from multiple assays
+## 3_integrated_assay_analyses/
 
-### Key Python Modules
+Cross-assay integration combining results from DualIPA, PPI, and Imaging assays.
 
-#### Utility Functions (`2_individual_assay_analyses/utils.py`)
+```
+3_integrated_assay_analyses/
+├── 1_inputs/
+│   ├── README.md
+│   ├── VarChAMP_data_supp_mat_PP.tsv        # Publication-ready assay results
+│   └── 0_all_gene_variants_assayed_summary.tsv  # 1,013-column annotations
+├── 2_analyses/
+│   └── 0_integrative_assay_summary.ipynb    # Main integration analysis
+└── 3_outputs/
+    └── pillar_manuscript_figures/
+        ├── assay_hit_per_gene.svg
+        ├── gene_assayability.svg
+        ├── PLP_BLB_hits.svg
+        └── assay_phenotyping_score_*.svg
+```
+
+**Key Input Files:**
+
+| File | Description |
+|------|-------------|
+| `VarChAMP_data_supp_mat_PP.tsv` | Authoritative source for assay scores/hits (12 columns) |
+| `0_all_gene_variants_assayed_summary.tsv` | Comprehensive annotations (1,013 columns: ClinVar, gnomAD, in silico predictors, G2P DMS data, structural features) |
+
+**Note:** `VarChAMP_data_supp_mat_PP.tsv` is imported from [broadinstitute/2025_laval_submitted](https://github.com/broadinstitute/2025_laval_submitted).
+
+---
+
+## utils/
+
+Shared utility files used across analyses.
+
+```
+utils/
+├── ARIAL.TTF     # Font for publication figures
+└── utils.py      # Shared Python functions
+```
+
+**Key Functions in `utils.py`:**
 - `plot_assay_hit_by_category()` - Visualization for hit rates by category
 - `compute_aubprc()` - Adjusted precision-recall metrics
 - `plot_auroc_curves()` - ROC curve analysis
 - `plot_gene_level_summary()` - Gene-level hit summaries
 
-#### Imaging Pipeline (`2_individual_assay_analyses/imaging/2_analyses/1_snakemake_pipeline/2025_varchamp_snakemake/`)
-- `preprocess/` - Data cleaning and normalization modules
-- `classification/` - Machine learning classification utilities
-- `profiling/` - Quality control and profiling tools
+---
+
+## Development Environment
+
+### Conda Environment
+```bash
+source "$HOME/software/anaconda3/etc/profile.d/conda.sh"
+conda activate varchamp
+```
+
+Or create from spec:
+```bash
+conda env create -f env.yml
+conda activate varchamp
+```
+
+### Key Dependencies
+- Python 3.8, numpy, pandas, matplotlib, seaborn, scikit-learn
+- Polars for high-performance data manipulation
+- Jupyter notebook environment
+
+---
 
 ## Data Standards
 
 ### File Formats
-- Primary data format: TSV/CSV files
-- Intermediate processing: Parquet files for performance
-- Notebooks: Jupyter (.ipynb) for analysis workflows
-- Configuration: JSON files for batch processing
+- **TSV/CSV**: Primary data format
+- **Parquet**: Intermediate processing (compressed with zstd)
+- **Jupyter notebooks**: Analysis workflows
+- **SVG**: Publication figures
 
 ### Naming Conventions
-- Batch naming: `YYYY_MM_DD_Batch_XX` format
-- Gene alleles: `gene_allele` column standard
-- ClinVar categories: `clinvar_clnsig_clean` with standardized values:
-  - `1_Pathogenic`, `2_Benign`, `3_Conflicting`, `4_VUS`, `5_Others`, `6_No_ClinVar`
+- Gene alleles: `gene_variant` = `symbol` + "_" + `aa_change` (e.g., `F9_Cys28Arg`)
+
+---
 
 ## Running Analyses
 
-### Jupyter Notebooks
-Most analysis workflows are implemented as numbered Jupyter notebooks in `2_analyses/` directories. Run them in sequence:
-
+### Imaging Analysis (F9)
 ```bash
-# Example: imaging analysis workflow
-jupyter notebook 2_individual_assay_analyses/imaging/2_analyses/2_analyze_cp_results/
-# Run notebooks 0_ through 5_ in order
+cd 2_dms_bms_overlap_analyses/imaging/2_analyses/F9_analyses/
+
+# Visualizations use pre-extracted parquet files
+jupyter notebook 1_F9_visualizations.ipynb
+jupyter notebook 2_F9_cell_crops.ipynb
+
+# To regenerate parquet files from external pipeline outputs:
+python 0_extract_f9_data.py
 ```
 
-### Batch Processing
-For large-scale data processing, use the shell scripts provided:
-
+### Integrated Analysis
 ```bash
-# Download raw data
-./download_aws_cpg_data.sh
-./download_raw_FACS.sh
-
-# Run snakemake pipelines
-./run_snakemake_pipeline.sh
+cd 3_integrated_assay_analyses/2_analyses/
+jupyter notebook 0_integrative_assay_summary.ipynb
 ```
 
-## Git Workflow
-
-This repository follows a fork-and-branch workflow:
-
+### Allele Collection
 ```bash
-# Fork the repository on GitHub, then clone your fork
-git clone https://github.com/<YOUR-USERNAME>/2025_Pillar_VarChAMP.git
-cd 2025_Pillar_VarChAMP
-
-# Create feature branch
-git checkout -b descriptive-branch-name
-
-# Make changes, then commit and push
-git add .
-git commit -m "descriptive commit message"
-git push  # Follow git's suggestions for first push
-
-# Create pull request via GitHub interface
+cd 1_allele_collection/2_analyses/
+jupyter notebook 0_pillar_allele_collection_process.ipynb
 ```
 
-## Performance Considerations
+---
 
-- The imaging pipeline requires substantial computational resources (256+ cores recommended)
-- GPU acceleration is available for CUDA-compatible workflows
-- Large datasets use Parquet format for efficient I/O
-- Snakemake provides parallel processing capabilities for batch operations
+## External Resources
+
+| Resource | URL |
+|----------|-----|
+| VarChAMP Snakemake Pipeline | https://github.com/broadinstitute/2025_varchamp_snakemake/releases/tag/PillarManuscript |
+| Laval Submitted (assay results) | https://github.com/broadinstitute/2025_laval_submitted (still private, will be released soon with the paper) |
